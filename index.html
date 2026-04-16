@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Scanner — After Party 17.04</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a1a;font-family:'Helvetica Neue',Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+h1{color:#e2e521;font-size:13px;letter-spacing:4px;text-transform:uppercase;margin-bottom:4px}
+.data{color:#fff;font-size:42px;font-weight:900;margin-bottom:24px}
+#reader{width:300px;border:3px solid #e2e521;background:#000;overflow:hidden}
+#reader video{width:100%!important;height:auto!important;object-fit:cover}
+.scan-txt{color:#555;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:12px;transition:all .3s}
+.divider{color:#555;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:24px 0 16px;width:300px;text-align:center}
+.manual-box{width:300px;text-align:center}
+.manual-box input{width:100%;padding:14px;font-size:18px;letter-spacing:4px;text-transform:uppercase;text-align:center;background:#000;color:#e2e521;border:3px solid #e2e521;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:bold;border-radius:0;-webkit-appearance:none}
+.manual-box input::placeholder{color:#555;font-size:12px;letter-spacing:2px;text-transform:uppercase}
+.btn{margin-top:10px;width:100%;background:#1a1a1a;color:#e2e521;border:2px solid #e2e521;padding:12px 24px;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:bold;-webkit-appearance:none;border-radius:0}
+.btn:active{background:#e2e521;color:#1a1a1a}
+
+/* Risultato */
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100}
+.overlay.show{display:flex}
+.risultato{padding:32px;text-align:center;width:320px;max-width:90vw}
+.stato-icon{font-size:56px;margin-bottom:12px}
+.r-nome{font-size:22px;font-weight:900;color:#fff;text-transform:uppercase}
+.r-info{font-size:12px;color:rgba(255,255,255,.8);margin-top:4px;letter-spacing:1px}
+.r-msg{font-size:14px;color:#fff;font-weight:bold;letter-spacing:2px;text-transform:uppercase;margin-top:14px}
+.btn-reset{margin-top:20px;background:#1a1a1a;color:#e2e521;border:2px solid #e2e521;padding:12px 24px;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:bold;-webkit-appearance:none;border-radius:0}
+.btn-reset:active{background:#e2e521;color:#1a1a1a}
+
+/* Loading */
+.loading{display:none;margin-top:20px;text-align:center}
+.loading.show{display:block}
+.loading p{color:#e2e521;font-size:12px;letter-spacing:2px;text-transform:uppercase}
+.spinner{width:30px;height:30px;border:3px solid #333;border-top:3px solid #e2e521;border-radius:50%;animation:spin .8s linear infinite;margin:10px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<h1>After Party · Scanner</h1>
+<div class="data">17.04</div>
+
+<div id="reader"></div>
+<p class="scan-txt" id="scan-txt">Inquadra il QR Code</p>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <p>Verifico...</p>
+</div>
+
+<div class="divider" id="divider">oppure inserisci ID manualmente</div>
+<div class="manual-box" id="manual-box">
+  <input type="text" id="manual-id" placeholder="Es: 9AAC1300" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+  <button class="btn" onclick="cercaManuale()">Verifica ID →</button>
+</div>
+
+<!-- Overlay risultato -->
+<div class="overlay" id="overlay">
+  <h1>After Party · Scanner</h1>
+  <div class="data" style="margin-bottom:16px">17.04</div>
+  <div class="risultato" id="box">
+    <div class="stato-icon" id="icon"></div>
+    <div class="r-nome" id="r-nome"></div>
+    <div class="r-info" id="r-info"></div>
+    <div class="r-msg" id="r-msg"></div>
+    <button class="btn-reset" onclick="reset()">Scansiona ancora →</button>
+  </div>
+</div>
+
+<script>
+var API_URL = "https://script.google.com/macros/s/AKfycbwlyrq-wGAM9wvxPNp4o9WcqkcBxCBVjAvsB7N7d1OfA8jCeSzWeIWtwrwnC8XHP169iA/exec";
+var scanning = true;
+var scanner = null;
+
+// ── Avvia camera ──
+function avvia() {
+  scanner = new Html5Qrcode("reader");
+  scanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+    onScan,
+    function() {}
+  ).then(function() {
+    document.getElementById("scan-txt").textContent = "Inquadra il QR Code";
+  }).catch(function(e) {
+    document.getElementById("scan-txt").textContent = "Camera non disponibile";
+    document.getElementById("reader").style.display = "none";
+  });
+}
+
+// ── QR scansionato ──
+function onScan(txt) {
+  if (!scanning) return;
+  scanning = false;
+
+  // Vibra per feedback
+  if (navigator.vibrate) navigator.vibrate(100);
+
+  var token = "";
+  try {
+    var d = JSON.parse(txt);
+    token = d.token;
+  } catch(e) {
+    token = txt;
+  }
+
+  mostraLoading();
+  verificaToken(token);
+}
+
+// ── Ricerca manuale per ID ──
+function cercaManuale() {
+  var id = document.getElementById("manual-id").value.trim();
+  if (!id || id.length < 4) {
+    alert("Inserisci un ID valido");
+    return;
+  }
+  scanning = false;
+  mostraLoading();
+  verificaID(id);
+}
+
+// ── Chiama API con token completo (da QR) ──
+function verificaToken(token) {
+  var url = API_URL + "?action=scan&token=" + encodeURIComponent(token);
+  fetch(url)
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      // Estrai i dati dal HTML di risposta
+      estraiRisultato(html);
+    })
+    .catch(function(e) {
+      nascondiLoading();
+      mostra({ stato: "non_trovato", nome: "Errore", messaggio: "Errore connessione", email: "" });
+    });
+}
+
+// ── Chiama API con ID parziale (manuale) ──
+function verificaID(id) {
+  var url = API_URL + "?action=manual&id=" + encodeURIComponent(id);
+  fetch(url)
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      estraiRisultato(html);
+    })
+    .catch(function(e) {
+      nascondiLoading();
+      mostra({ stato: "non_trovato", nome: "Errore", messaggio: "Errore connessione", email: "" });
+    });
+}
+
+// ── Estrai dati dal HTML restituito da Apps Script ──
+function estraiRisultato(html) {
+  nascondiLoading();
+  try {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(html, "text/html");
+
+    var nome = "";
+    var email = "";
+    var messaggio = "";
+    var stato = "non_trovato";
+
+    // Cerca gli elementi nella pagina risultato
+    var nomeEl = doc.querySelector(".r-nome");
+    var infoEl = doc.querySelector(".r-info");
+    var msgEl = doc.querySelector(".r-msg");
+    var risultatoEl = doc.querySelector(".risultato");
+
+    if (nomeEl) nome = nomeEl.textContent;
+    if (infoEl) email = infoEl.textContent;
+    if (msgEl) messaggio = msgEl.textContent;
+
+    // Determina lo stato dal colore di sfondo
+    if (risultatoEl) {
+      var bg = risultatoEl.getAttribute("style") || "";
+      if (bg.indexOf("#00c853") !== -1) stato = "ok";
+      else if (bg.indexOf("#ff6d00") !== -1) stato = "gia_entrato";
+      else if (bg.indexOf("#d50000") !== -1) {
+        if (messaggio.toLowerCase().indexOf("pagamento") !== -1) stato = "non_pagato";
+        else stato = "non_trovato";
+      }
+    }
+
+    mostra({ stato: stato, nome: nome, email: email, messaggio: messaggio });
+  } catch(e) {
+    mostra({ stato: "non_trovato", nome: "Errore", messaggio: "Errore lettura risposta", email: "" });
+  }
+}
+
+// ── Mostra risultato ──
+function mostra(d) {
+  var overlay = document.getElementById("overlay");
+  var box = document.getElementById("box");
+  var colori = { ok: "#00c853", gia_entrato: "#ff6d00", non_pagato: "#d50000", non_trovato: "#d50000" };
+  var icone = { ok: "✅", gia_entrato: "⚠️", non_pagato: "🚫", non_trovato: "❌" };
+
+  box.style.background = colori[d.stato] || "#d50000";
+  document.getElementById("icon").textContent = icone[d.stato] || "❓";
+  document.getElementById("r-nome").textContent = d.nome || "—";
+  document.getElementById("r-info").textContent = d.email || "";
+  document.getElementById("r-msg").textContent = d.messaggio || "";
+
+  overlay.classList.add("show");
+}
+
+// ── Reset ──
+function reset() {
+  document.getElementById("overlay").classList.remove("show");
+  document.getElementById("manual-id").value = "";
+  scanning = true;
+}
+
+// ── Loading ──
+function mostraLoading() {
+  document.getElementById("loading").classList.add("show");
+  document.getElementById("manual-box").style.display = "none";
+  document.getElementById("divider").style.display = "none";
+}
+
+function nascondiLoading() {
+  document.getElementById("loading").classList.remove("show");
+  document.getElementById("manual-box").style.display = "block";
+  document.getElementById("divider").style.display = "block";
+}
+
+// ── Start ──
+avvia();
+</script>
+</body>
+</html>
