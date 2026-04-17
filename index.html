@@ -12,88 +12,53 @@ h1{color:#e2e521;font-size:13px;letter-spacing:4px;text-transform:uppercase;marg
 .data{color:#fff;font-size:42px;font-weight:900;margin-bottom:24px}
 #reader{width:300px;height:300px;border:3px solid #e2e521;background:#000;overflow:hidden}
 .scan-txt{color:#555;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:12px}
+.found{color:#e2e521;font-size:14px;letter-spacing:2px;text-transform:uppercase;margin-top:16px;font-weight:bold;display:none;text-align:center}
 .divider{color:#555;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:24px 0 16px;width:300px;text-align:center}
 .manual-box{width:300px;text-align:center}
 .manual-box input{width:100%;padding:14px;font-size:18px;letter-spacing:4px;text-transform:uppercase;text-align:center;background:#000;color:#e2e521;border:3px solid #e2e521;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:bold;border-radius:0;-webkit-appearance:none}
 .manual-box input::placeholder{color:#555;font-size:12px;letter-spacing:2px;text-transform:uppercase}
 .btn{margin-top:10px;width:100%;background:#1a1a1a;color:#e2e521;border:2px solid #e2e521;padding:12px 24px;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:bold;-webkit-appearance:none;border-radius:0}
-.btn:active{background:#e2e521;color:#1a1a1a}
-.success-scan{color:#e2e521;font-size:14px;letter-spacing:2px;text-transform:uppercase;margin-top:16px;font-weight:bold;display:none;text-align:center}
 </style>
 </head>
 <body>
-
 <h1>After Party · Scanner</h1>
 <div class="data">17.04</div>
-
 <div id="reader"></div>
 <p class="scan-txt" id="scan-txt">Inquadra il QR Code</p>
-<p class="success-scan" id="success-scan">QR Letto! Verifico...</p>
-
-<div class="divider" id="divider">oppure inserisci ID manualmente</div>
-<div class="manual-box" id="manual-box">
-  <input type="text" id="manual-id" placeholder="Es: 9AAC1300" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
-  <button class="btn" onclick="cercaManuale()">Verifica ID →</button>
+<p class="found" id="found">QR LETTO! VERIFICO...</p>
+<div class="divider">oppure inserisci ID manualmente</div>
+<div class="manual-box">
+<input type="text" id="manual-id" placeholder="Es: 9AAC1300" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+<button class="btn" onclick="cercaManuale()">Verifica ID →</button>
 </div>
-
 <script>
-var API_URL = "https://script.google.com/macros/s/AKfycbwlyrq-wGAM9wvxPNp4o9WcqkcBxCBVjAvsB7N7d1OfA8jCeSzWeIWtwrwnC8XHP169iA/exec";
-var scanning = true;
-var scanner = null;
-
-function avvia() {
-  scanner = new Html5Qrcode("reader");
-  scanner.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: { width: 250, height: 250 } },
-    onScan,
-    function() {}
-  ).then(function() {
-    document.getElementById("scan-txt").textContent = "Inquadra il QR Code";
-  }).catch(function(e) {
-    document.getElementById("scan-txt").textContent = "Camera non disponibile";
-    document.getElementById("reader").style.display = "none";
-  });
+var U="https://script.google.com/macros/s/AKfycbyBcaTiIA8IH2uCJc44ksDmzEiOxLyV_owC9LD84QyKzKDc2CfLQSRXVrnLmWD-hxRyVw/exec";
+var ok=true;
+var s=new Html5Qrcode("reader");
+s.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},function(txt){
+if(!ok)return;
+ok=false;
+if(navigator.vibrate)navigator.vibrate(100);
+document.getElementById("scan-txt").style.display="none";
+document.getElementById("found").style.display="block";
+s.stop().then(function(){
+var t="";
+try{t=JSON.parse(txt).token}catch(e){t=txt}
+window.location.href=U+"?action=scan&token="+encodeURIComponent(t);
+}).catch(function(){
+var t="";
+try{t=JSON.parse(txt).token}catch(e){t=txt}
+window.location.href=U+"?action=scan&token="+encodeURIComponent(t);
+});
+},function(){}).catch(function(){
+document.getElementById("scan-txt").textContent="Camera non disponibile";
+document.getElementById("reader").style.display="none";
+});
+function cercaManuale(){
+var id=document.getElementById("manual-id").value.trim();
+if(!id||id.length<4){alert("Inserisci un ID valido");return}
+window.location.href=U+"?action=manual&id="+encodeURIComponent(id);
 }
-
-function onScan(txt) {
-  if (!scanning) return;
-  scanning = false;
-
-  if (navigator.vibrate) navigator.vibrate(100);
-
-  document.getElementById("scan-txt").style.display = "none";
-  document.getElementById("success-scan").style.display = "block";
-  document.getElementById("manual-box").style.display = "none";
-  document.getElementById("divider").style.display = "none";
-
-  if (scanner) {
-    scanner.stop().catch(function(){});
-  }
-
-  var token = "";
-  try {
-    var d = JSON.parse(txt);
-    token = d.token;
-  } catch(e) {
-    token = txt;
-  }
-
-  setTimeout(function() {
-    window.location.href = API_URL + "?action=scan&token=" + encodeURIComponent(token);
-  }, 500);
-}
-
-function cercaManuale() {
-  var id = document.getElementById("manual-id").value.trim();
-  if (!id || id.length < 4) {
-    alert("Inserisci un ID valido");
-    return;
-  }
-  window.location.href = API_URL + "?action=manual&id=" + encodeURIComponent(id);
-}
-
-avvia();
 </script>
 </body>
 </html>
